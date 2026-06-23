@@ -223,6 +223,90 @@ th button svg{width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2}
 .b12-btn{width:100%;margin-top:12px;background:#FF620B;color:#fff;border:none;border-radius:4px;padding:13px;font-size:13px;font-weight:700;letter-spacing:1.5px;font-family:'Barlow Condensed',sans-serif;cursor:pointer;transition:opacity .15s}
 .b12-btn:hover{opacity:.85}
 .b12-err{color:#ff4444;font-size:12px;margin-top:10px;height:16px}
+
+/* ═══════════════════ MOBILE (≤600px) ═══════════════════ */
+@media(max-width:600px){
+  /* TOPBAR em duas linhas: controles em cima, navegação rolável embaixo */
+  .topbar{
+    height:auto;min-height:auto;padding:8px 10px 0 10px;
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  }
+  .logo{font-size:22px;order:1}
+  .topbar-sub{display:none}
+  .year-sel{order:2;font-size:13px;padding:6px 9px;margin-left:auto}
+  .btn-sync{order:3;font-size:11px;padding:6px 9px;margin-left:0}
+  .btn-logout{display:none}
+  /* Navegação: botões fluem em linhas, ocupando a largura disponível */
+  .nav-btn{
+    order:4;flex:1 1 auto;min-width:30%;justify-content:center;
+    padding:10px 8px;font-size:12px;gap:5px;
+  }
+  .nav-btn svg{width:14px;height:14px;flex-shrink:0}
+
+  /* KPIs: 2 colunas, mais ar */
+  .kpi-strip{grid-template-columns:repeat(2,1fr)!important}
+  .kpi{padding:16px 14px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .kpi-label{font-size:10px}
+  .kpi-val{font-size:19px}
+  .kpi-sub{font-size:11px}
+
+  /* Mês: botões maiores p/ tocar com o dedo */
+  .month-nav{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .mnav-left{flex-wrap:nowrap}
+  .mnav-btn{padding:12px 14px;font-size:13px}
+
+  /* Conteúdo das abas: menos padding */
+  .tab-content{padding:14px}
+  .section-card{padding:16px 14px}
+
+  /* Gráficos: empilha e ocupa largura toda */
+  .charts-grid{grid-template-columns:1fr}
+  .chart-panel{padding:18px 14px}
+  .chart-full{height:260px}
+  .analytics-section{padding:18px 14px}
+  .analytics-controls{gap:8px}
+  .analytics-controls select{min-width:0;flex:1}
+
+  /* Insights: 1 coluna */
+  .insights-strip{grid-template-columns:1fr!important}
+
+  /* TABELAS: viram scroll horizontal suave dentro de um container */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:6px}
+  table{font-size:12px;min-width:520px}
+  th,td{padding:8px 8px}
+
+  /* Forms: 1 coluna, inputs maiores */
+  .form-grid,.form-grid-4{grid-template-columns:1fr!important}
+  input,select,textarea{font-size:16px;padding:11px 12px} /* 16px evita zoom no iOS */
+  .btn-primary,.btn-success,.btn-outline{padding:11px 16px;font-size:13px}
+
+  /* Modais: ocupam quase a tela toda */
+  .modal{width:94vw!important;max-width:94vw!important;padding:22px 18px}
+  .modal-grid{grid-template-columns:1fr!important}
+
+  /* Donuts: empilha legenda embaixo */
+  .donut-wrap{flex-direction:column;align-items:center;gap:16px}
+  .donut-wrap canvas{margin:0 auto}
+
+  /* Esconde a coluna logout no mobile (usa o app, não fecha janela) */
+  .btn-logout{display:none}
+}
+
+/* FAB — botão flutuante de lançamento rápido (só mobile) */
+#fabLancar{
+  display:none;
+  position:fixed;right:18px;bottom:18px;z-index:9000;
+  width:58px;height:58px;border-radius:50%;
+  background:var(--orange);color:#fff;border:none;
+  font-size:30px;line-height:1;font-weight:300;
+  box-shadow:0 4px 16px rgba(255,98,11,.45);
+  cursor:pointer;align-items:center;justify-content:center;
+  padding-bottom:4px;
+}
+@media(max-width:600px){
+  #fabLancar{display:flex}
+}
+
 </style>
 </head>
 <body>
@@ -266,6 +350,7 @@ th button svg{width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2}
 
 
 <!-- TOPBAR -->
+<button id="fabLancar" onclick="fabNovoLancamento()" title="Novo lançamento" aria-label="Novo lançamento">+</button>
 <div class="topbar">
   <span class="logo"><span class="a">ARENA</span><span class="b">B12</span></span>
   <span class="topbar-sub">FINANCEIRO</span>
@@ -574,6 +659,16 @@ function nextId(){ return Date.now()+Math.random().toString(36).slice(2); }
 // ═══════════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════════
+
+function fabNovoLancamento(){
+  setTab('importar');
+  // foca o campo de descrição do lançamento manual após render
+  setTimeout(function(){
+    var d=document.getElementById('m-desc');
+    if(d){ d.scrollIntoView({behavior:'smooth',block:'center'}); d.focus(); }
+  }, 120);
+}
+
 function setTab(t){
   currentTab=t;
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));

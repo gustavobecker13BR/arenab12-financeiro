@@ -4,6 +4,14 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Arena B12 — Financeiro 2026</title>
+<meta name="theme-color" content="#0a0a0a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="B12 Financeiro"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
@@ -202,9 +210,60 @@ th button svg{width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2}
 .info-cell b{color:var(--orange)}
 .gas-url-note{font-size:13px;color:var(--muted2);margin-top:4px;letter-spacing:.5px}
 .gas-url-input{font-size:13px;font-family:monospace;background:var(--surf2);border:1px solid var(--border2)}
+
+/* LOGIN OVERLAY */
+#b12LoginScreen{position:fixed;inset:0;z-index:99999;background:#0a0a0a;display:flex;align-items:center;justify-content:center}
+.b12-card{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:44px 52px;width:340px;text-align:center}
+.b12-logo{font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:800;margin-bottom:6px}
+.b12-logo .a{color:#FF620B}.b12-logo .b{color:#fff}
+.b12-sub{font-size:10px;letter-spacing:3px;color:#444;margin-bottom:36px}
+.b12-label{font-size:10px;letter-spacing:2px;color:#555;margin-bottom:10px;text-align:left;font-family:'Barlow Condensed',sans-serif}
+.b12-input{width:100%;background:#161616;border:1px solid #2a2a2a;border-radius:4px;color:#fff;padding:13px 16px;font-size:22px;letter-spacing:10px;text-align:center;font-family:'Barlow Condensed',sans-serif;outline:none;transition:border-color .2s}
+.b12-input:focus{border-color:#FF620B}
+.b12-btn{width:100%;margin-top:12px;background:#FF620B;color:#fff;border:none;border-radius:4px;padding:13px;font-size:13px;font-weight:700;letter-spacing:1.5px;font-family:'Barlow Condensed',sans-serif;cursor:pointer;transition:opacity .15s}
+.b12-btn:hover{opacity:.85}
+.b12-err{color:#ff4444;font-size:12px;margin-top:10px;height:16px}
 </style>
 </head>
 <body>
+
+<div id="b12LoginScreen">
+  <div class="b12-card">
+    <div class="b12-logo"><span class="a">ARENA</span><span class="b">B12</span></div>
+    <div class="b12-sub">FINANCEIRO</div>
+    <div class="b12-label">SENHA DE ACESSO</div>
+    <input type="password" class="b12-input" id="b12Pin" maxlength="20" placeholder="••••" onkeydown="if(event.key==='Enter')b12Check()"/>
+    <button class="b12-btn" onclick="b12Check()">ENTRAR →</button>
+    <div class="b12-err" id="b12Err"></div>
+  </div>
+</div>
+<script>
+(function(){
+  var HASH='4540403f';
+  function hsh(p){var h='';for(var i=0;i<p.length;i++)h+=(p.charCodeAt(i)+13).toString(16);return h;}
+  window.b12Check=function(){
+    var pin=document.getElementById('b12Pin').value;
+    if(hsh(pin)===HASH){
+      sessionStorage.setItem('b12auth','1');
+      document.getElementById('b12LoginScreen').style.display='none';
+      document.getElementById('b12Pin').value='';
+    }else{
+      var e=document.getElementById('b12Err');
+      e.textContent='Senha incorreta.';
+      setTimeout(function(){e.textContent='';},2000);
+      document.getElementById('b12Pin').value='';
+      document.getElementById('b12Pin').focus();
+    }
+  };
+  if(sessionStorage.getItem('b12auth')==='1'){
+    document.addEventListener('DOMContentLoaded',function(){
+      var s=document.getElementById('b12LoginScreen');
+      if(s) s.style.display='none';
+    });
+  }
+})();
+</script>
+
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -2209,6 +2268,13 @@ if(GAS_URL){
   }
 }
 addLog('SISTEMA', `Dashboard iniciado — ${new Date().toLocaleDateString('pt-BR')}`, false);
+</script>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
 </script>
 </body>
 </html>

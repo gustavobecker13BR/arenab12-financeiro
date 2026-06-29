@@ -584,6 +584,26 @@ async function gasWriteMonths(year, monthsObj){
   }catch(e){ console.error('gasWriteMonths error:', e); return false; }
 }
 
+// MERGE: envia só lançamentos novos/alterados (não o mês inteiro).
+// O servidor junta com o que já existe, sem apagar lançamentos de outro dispositivo.
+async function gasMergeTxns(year, txnsList, deletedIds){
+  if(!GAS_URL) return false;
+  try{
+    const months = {};
+    (txnsList||[]).forEach(t=>{
+      if(!months[t.month]) months[t.month]=[];
+      months[t.month].push(t);
+    });
+    await fetch(GAS_URL, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'merge', year, months, deletedIds: deletedIds||[]})
+    });
+    return true;
+  }catch(e){ console.error('gasMergeTxns error:', e); return false; }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // LOCAL STORAGE (fallback / cache)
 // ═══════════════════════════════════════════════════════════════════
@@ -1523,15 +1543,15 @@ async function confirmImport(){
   lsSave();
   addLog('IMPORTAÇÃO', `${pendingTxns.length} lançamentos de ${src} — ${months}/${currentYear}`, true, snapshot);
   if(GAS_URL){
-    // Envia só os meses importados (mais eficiente)
-    const affectedMonths=[...new Set(pendingTxns.map(t=>({y:t.year,m:t.month})).map(x=>x.y+'_'+x.m))];
-    const byYM={};
-    affectedMonths.forEach(ym=>{
-      const [y,m]=[parseInt(ym.split('_')[0]),parseInt(ym.split('_')[1])];
-      if(!byYM[y]) byYM[y]={};
-      byYM[y][m]=allTxns.filter(t=>t.year===y&&t.month===m);
+    // Merge: envia só os lançamentos importados (cada um com id único).
+    // Não apaga o que outro dispositivo já colocou no mesmo mês.
+    const byYear={};
+    pendingTxns.forEach(t=>{
+      const y=t.year||currentYear;
+      if(!byYear[y]) byYear[y]=[];
+      byYear[y].push(t);
     });
-    Promise.all(Object.entries(byYM).map(([y,months])=>gasWriteMonths(parseInt(y),months)))
+    Promise.all(Object.entries(byYear).map(([y,list])=>gasMergeTxns(parseInt(y),list)))
       .then(results=>{ if(results.every(Boolean)) showToast('Salvo no Google Sheets ✓'); else showToast('Salvo localmente (Sheets parcial)',false,true); });
   }
   selMonth=pendingTxns[0]?.month??selMonth;
@@ -1746,7 +1766,7 @@ function addManual(){
   allTxns.push(t);
   lsSave();
   addLog('MANUAL', `${type==='entrada'?'+':'-'}${fmtFull(v)} — "${desc}" — ${MESES_FULL[mesIdx]}/${currentYear}`, true, snapshot);
-  if(GAS_URL) gasWrite(allTxns);
+  if(GAS_URL) gasMergeTxns(currentYear, [t]);
   selMonth=mesIdx;
   setTab('dashboard');
   showToast('Lançamento adicionado!');
@@ -1790,7 +1810,7 @@ function saveEdit(){
   };
   lsSave();
   addLog('EDIÇÃO', `"${allTxns[idx].desc}" → cat: ${allTxns[idx].category} | val: ${fmtFull(allTxns[idx].value)}`, true, snapshot);
-  if(GAS_URL) gasWrite(allTxns);
+  if(GAS_URL) gasMergeTxns(currentYear, [allTxns[idx]]);
   closeEditModal();
   renderNav();renderMain();
   showToast('Lançamento atualizado.');
@@ -1802,7 +1822,7 @@ function confirmDelTxn(id){
   openConfirm(`Excluir lançamento?`,`Excluir "${t.desc}" (${t.type==='entrada'?'+':'-'}${fmtFull(t.value)})? Esta ação não pode ser desfeita.`,()=>{
     const snapshot = JSON.stringify(allTxns);
     allTxns=allTxns.filter(x=>x.id!==id);
-    lsSave(); if(GAS_URL) gasWrite(allTxns);
+    lsSave(); if(GAS_URL) gasMergeTxns(currentYear, [], [id]);
     addLog('EXCLUSÃO', `"${t.desc}" ${t.type==='entrada'?'+':'-'}${fmtFull(t.value)} — ${MESES_FULL[t.month]}/${currentYear}`, true, snapshot);
     renderNav();renderMain();showToast('Lançamento excluído.');
   });
@@ -1830,11 +1850,10 @@ function clearSourceMonth(src){
     `Esta ação irá apagar ${list.length} lançamentos da fonte "${src}" em ${MESES_FULL[selMonth]}/${currentYear}. Outras fontes não serão afetadas.`,
     ()=>{
       const snapshot = JSON.stringify(allTxns);
-      const ids=new Set(list.map(t=>t.id));
-      const months=[...new Set(list.map(t=>t.month))];
-      allTxns=allTxns.filter(t=>!ids.has(t.id));
+      const ids=list.map(t=>t.id);
+      allTxns=allTxns.filter(t=>!ids.includes(t.id));
       lsSave();
-      if(GAS_URL){ const byM={}; months.forEach(m=>{byM[m]=allTxns.filter(t=>t.year===currentYear&&t.month===m);}); gasWriteMonths(currentYear,byM); }
+      if(GAS_URL) gasMergeTxns(currentYear, [], ids);
       addLog('LIMPEZA', `${list.length} lançamentos de ${src} em ${MESES_FULL[selMonth]}/${currentYear} removidos`, true, snapshot);
       renderNav();renderMain();showToast(`${list.length} lançamentos de ${src} removidos.`);
     });

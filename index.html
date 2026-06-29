@@ -716,7 +716,7 @@ async function syncFromGas(silent=false){
     const isEmpty = allTxns.length === 0;
 
     if(isEmpty){
-      // Local vazio — puxa TODOS os anos do Sheets via stats + leitura individual
+      // Local vazio — puxa TODOS os anos do Sheets
       if(!silent) showToast('Conectando ao Google Sheets...', false, true);
       const stats = await gasStats();
       if(!stats || stats.error || !stats.by_year){
@@ -740,36 +740,53 @@ async function syncFromGas(silent=false){
         lsSave();
         renderNav();
         renderMain();
-        showToast('✓ '+allTxns.length+' lançamentos carregados do Sheets!');
+        if(!silent) showToast('✓ '+allTxns.length+' lançamentos carregados do Sheets!');
       } else {
         if(!silent) showToast('Sheets não retornou dados.', false, true);
       }
       return;
     }
 
-    // Tem dados locais — sincroniza ano a ano
-    const stats = await gasStats();
-    if(!stats || !stats.by_year) return;
-    const years = [...new Set([
-      ...Object.keys(stats.by_year).map(Number),
-      ...allTxns.map(t=>t.year)
-    ])].filter(y=>y>=2025);
+    // ── TEM DADOS LOCAIS: faz MERGE de verdade ──
+    // 1) Envia os lançamentos locais via merge (o servidor junta sem apagar o do outro)
+    // 2) Lê de volta o estado mesclado e adota como verdade (une por id, sem perder nada)
+    const localByYear = {};
+    allTxns.forEach(t=>{
+      const y = t.year || currentYear;
+      if(!localByYear[y]) localByYear[y]=[];
+      localByYear[y].push(t);
+    });
 
-    let changed = false;
+    // Descobre todos os anos relevantes (locais + os que existem no Sheets)
+    const stats = await gasStats();
+    const sheetYears = (stats && stats.by_year) ? Object.keys(stats.by_year).map(Number) : [];
+    const years = [...new Set([...Object.keys(localByYear).map(Number), ...sheetYears])].filter(y=>y>=2025);
+
+    // 1) Push merge dos locais, ano a ano
+    for(const y of Object.keys(localByYear)){
+      await gasMergeTxns(parseInt(y), localByYear[y]);
+    }
+
+    // Pequena espera para o servidor consolidar a escrita antes de reler
+    await new Promise(r=>setTimeout(r, 900));
+
+    // 2) Pull do estado consolidado e une por id com o local
+    const byId = {};
+    allTxns.forEach(t=>{ if(t && t.id!=null) byId[t.id]=t; });
     for(const y of years){
       const data = await gasRead(y);
-      const sheetTxns = data?.txns || [];
-      const localForYear = allTxns.filter(t=>t.year===y);
-      if(sheetTxns.length > localForYear.length){
-        allTxns = [...allTxns.filter(t=>t.year!==y), ...sheetTxns];
-        changed = true;
-      }
+      const sheetTxns = (data && data.txns) ? data.txns : [];
+      sheetTxns.forEach(t=>{ if(t && t.id!=null) byId[t.id]=t; });
     }
-    if(changed){
-      lsSave(); renderNav(); renderMain();
-      if(!silent) showToast('✓ Dados atualizados do Sheets!');
-    } else {
-      if(!silent) showToast('Sheets já está sincronizado ✓', false, true);
+    const merged = Object.keys(byId).map(k=>byId[k]);
+
+    const changed = merged.length !== allTxns.length;
+    allTxns = merged;
+    lsSave();
+    renderNav();
+    renderMain();
+    if(!silent){
+      showToast('✓ Sincronizado — '+allTxns.length+' lançamentos no total.');
     }
   }catch(e){
     if(!silent) showToast('Erro de sincronização: '+e.message, true);
@@ -787,8 +804,8 @@ async function pushMonthToSheets(year, month){
 async function manualSync(){
   const btn = document.getElementById('btnSync');
   if(btn){ btn.classList.add('syncing'); btn.textContent='⟳ Sync'; }
-  // Sempre força envio de todos os dados locais primeiro, depois verifica Sheets
-  await forcePushAll();
+  // Merge de verdade: envia os locais (sem apagar o do outro) e puxa o consolidado
+  await syncFromGas(false);
   if(btn){ btn.classList.remove('syncing'); btn.textContent='⇄ Sync'; }
 }
 
@@ -2366,20 +2383,9 @@ loadFornecedores();
 selMonth=new Date().getMonth();
 setTab('dashboard');
 if(GAS_URL){
-  if(allTxns.length > 0){
-    // Tem dados locais → envia para Sheets em background
-    const byYear = {};
-    allTxns.forEach(t=>{
-      const y = t.year||currentYear;
-      if(!byYear[y]) byYear[y]={};
-      if(!byYear[y][t.month]) byYear[y][t.month]=[];
-      byYear[y][t.month].push(t);
-    });
-    Object.entries(byYear).forEach(([y,months])=>gasWriteMonths(parseInt(y),months));
-  } else {
-    // Sem dados locais → puxa tudo do Sheets
-    syncFromGas(false);
-  }
+  // Sempre sincroniza via merge: envia os locais sem apagar o do outro e puxa o consolidado.
+  // Funciona tanto com dados locais quanto sem (syncFromGas trata os dois casos).
+  syncFromGas(true);
 }
 addLog('SISTEMA', `Dashboard iniciado — ${new Date().toLocaleDateString('pt-BR')}`, false);
 </script>

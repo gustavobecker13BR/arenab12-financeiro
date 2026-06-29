@@ -663,7 +663,7 @@ function computeSummary(txns){
       expense[c]=(expense[c]||0)+v; totalOut+=v;
     }
   });
-  const bar = (income['Receita Bebidas']||0)+(income['Receita Alimentos']||0)+(income['Outras Receitas']||0);
+  const bar = (income['Receita Bebidas']||0)+(income['Receita Alimentos']||0);
   const quadra = (income['Locação Quadra 1']||0)+(income['Locação Quadra 2']||0)+(income['Locação Quadra Areia']||0);
   const lucro = totalIn-totalOut;
   const mb = totalIn>0?(totalIn-(expense['Reposição de Estoque - Bebidas']||0)-(expense['Reposição de Estoque - Alimentos']||0)-(expense['Reposição de Estoque - Outros']||0))/totalIn:0;
